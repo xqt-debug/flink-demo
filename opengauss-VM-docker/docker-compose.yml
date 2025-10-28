@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  opengauss:
+
+    image: enmotech/opengauss:latest
+    
+    # 容器启动后的名称
+    container_name: opengauss
+    
+    environment:
+      GS_PASSWORD: XQT@mypass123456
+      # 设置时区，避免数据和系统时间不一致
+      TZ: Asia/Shanghai
+      
+    # 端口映射：将主机的 3306 端口映射到容器的 3306 端口
+    ports:
+      - "5432:5432"
+      
+    volumes:
+      - ./data:/var/lib/opengauss/data
+    privileged: true
+      
+    # 自动重启策略：容器退出或主机重启时，自动尝试重新启动
+    restart: always

@@ -1,0 +1,107 @@
+version: '3.7'
+
+services:
+  # 1. Zookeeper 服务
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper
+    container_name: zookeeper
+    restart: unless-stopped
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # 2. Kafka Broker 1
+  kafka1:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka1
+    container_name: kafka1
+    restart: unless-stopped
+    # 外部端口 9091 映射到 容器内部的 9092 端口
+    ports:
+      - "9091:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      
+      # 💥 最终修正：只使用一个监听器 PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      
+      # 宣告外部静态 IP，Broker 间和外部客户端都通过此地址连接
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://192.168.118.129:9091
+      
+      KAFKA_CREATE_TOPICS: "scores:3:2"
+      
+    # 💥 关键修正：必须使用独立的日志目录
+    volumes:
+      - ./kafka1-logs:/kafka
+
+  # 3. Kafka Broker 2
+  kafka2:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka2
+    container_name: kafka2
+    restart: unless-stopped
+    # 外部端口 9092 映射到 容器内部的 9092 端口
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      
+      # 宣告外部静态 IP
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://192.168.118.129:9092
+      
+      KAFKA_CREATE_TOPICS: "scores:3:2"
+      
+    volumes:
+      - ./kafka2-logs:/kafka
+
+  # 4. Kafka Broker 3
+  kafka3:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka3
+    container_name: kafka3
+    restart: unless-stopped
+    # 外部端口 9093 映射到 容器内部的 9092 端口
+    ports:
+      - "9093:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      
+      # 宣告外部静态 IP
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://192.168.118.129:9093
+      
+      KAFKA_CREATE_TOPICS: "scores:3:2"
+      
+    volumes:
+      - ./kafka3-logs:/kafka
+
+  # 5. Kafka UI (Manager)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    restart: unless-stopped
+    # 外部通过 8080 访问 UI 界面
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka1
+      - kafka2
+      - kafka3
+    environment:
+      # 💥 关键修正：UI 必须连接到外部广告地址（您的静态 IP 和端口）
+      KAFKA_CLUSTERS_0_NAME: local-kafka-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: 192.168.118.129:9091,192.168.118.129:9092,192.168.118.129:9093
+      DYNAMIC_CONFIG_ENABLED: "true"
